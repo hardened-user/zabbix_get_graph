@@ -11,8 +11,7 @@ Required
 
 Example
 =======
-
-  ./zabbix_get_graph.py
+    ./zabbix_get_graph.py
 
 
 Visit also [WiKi](http://wiki.enchtex.info/handmade/zabbix/zabbix_get_graph).
