@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# 04.04.2018
 #--------------------------------------------------------------------------------------------------
 import os
 import re
@@ -18,20 +17,31 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
+_SUPPORTED_ZABBIX_VERSIONS = ("3.0", "3.2", "3.4", "4.0")
+
+
 def main():
-    #______________________________________________________
+    #__________________________________________________________________________
     # Входящие аргументы
     try:
         parser = argparse.ArgumentParser(description='Zabbix Get Graph - utility for downloading graphs from Zabbix Frontend')
-        parser.add_argument("-t", action='store', default=None, dest="task", metavar='<TASK NAME>',
-                            help="specified task name")
+        parser.add_argument("task", action='store', default=None, nargs='?', metavar='<TASK>',
+                            help="specified task")
+        parser.add_argument('--test', action='store_true', default=False, dest="test",
+                            help="test mode")
         args = parser.parse_args()
     except SystemExit:
         return False
-    #______________________________________________________
+    #__________________________________________________________________________
     # Подключение config файла
-    config_ini = configparser.ConfigParser()
-    config_ini.read('config.ini')
+    try:
+        self_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+        config_ini = configparser.ConfigParser()
+        config_ini.read(os.path.join(self_dir, 'config.ini'))
+    except Exception as err:
+        print("[EE] Exception Err: {}".format(err), file=sys.stderr)
+        print("[EE] Exception Inf: {}".format(sys.exc_info()), file=sys.stderr)
+        return False
     if not config_ini.sections() or 'default' not in config_ini.sections():
         print("[EE] Configuration failed", file=sys.stderr)
         return False
@@ -47,55 +57,67 @@ def main():
             continue
         print("[..] Working '{}'...".format(task))
         config_task = {
+                'zabbix_version'    : "4.0",
                 'zabbix_url'        : None,
                 'zabbix_user'       : None,
                 'zabbix_pass'       : None,
                 'graphids'          : [],
                 'time_from'         : None,
                 'time_till'         : None,
-                'img_widht'         : 1400,
+                'img_widht'         : None,
+                'img_height'        : None,
+                'img_legend'        : True,
                 'img_directory'     : None,
-                'img_prefix'        : None,
+                'img_prefix'        : '',
             }
-        ### task
-        for x in config_task:
-            try:
-                config_task[x] = config_ini[task][x]
-            except KeyError:
-                pass
-            except Exception as err:
-                print("[EE] Exception Err: {}".format(err), file=sys.stderr)
-                print("[EE] Exception Inf: {}".format(sys.exc_info()), file=sys.stderr)
-                return False
         ### default
         for x in config_task:
             try:
-                config_task[x] = config_ini['default'][x]
+                config_task[x] = config_ini['default'][x] # <'str'>
             except KeyError:
                 pass
             except Exception as err:
                 print("[EE] Exception Err: {}".format(err), file=sys.stderr)
                 print("[EE] Exception Inf: {}".format(sys.exc_info()), file=sys.stderr)
                 return False
-        #__________________________________________________
-        # Проверка директорий
-        if not check_access_dir('rw', config_task['img_directory']):
+        ### task
+        for x in config_task:
+            try:
+                config_task[x] = config_ini[task][x] # <'str'>
+            except KeyError:
+                pass
+            except Exception as err:
+                print("[EE] Exception Err: {}".format(err), file=sys.stderr)
+                print("[EE] Exception Inf: {}".format(sys.exc_info()), file=sys.stderr)
+                return False
+        #______________________________________________________________________
+        ### zabbix_version
+        if config_task['zabbix_version'] not in _SUPPORTED_ZABBIX_VERSIONS:
+            print("[EE] Unupported version", file=sys.stderr)
             return False
-        #__________________________________________________
-        # graphids
+        ### graphids
         if not config_task['graphids']:
             print("[EE] Configuration failed: 'graphids'", file=sys.stderr)
             return False
         config_task['graphids'] = config_task['graphids'].strip().split()
-        #__________________________________________________
-        # img_prefix
-        re_simple_str = re.compile("^([\w\-]+)$")
-        if not config_task['img_prefix']:
-            config_task['img_prefix'] = ''
-        elif not re_simple_str.search(config_task['img_prefix']):
+        ### img_legend
+        if isinstance(config_task['img_legend'], str):
+            if config_task['img_legend'].lower() in ('0', 'false', 'off'):
+                config_task['img_legend'] = False
+            elif config_task['img_legend'].lower() in ('1', 'true', 'on'):
+                config_task['img_legend'] = True
+            else:
+                print("[EE] Configuration failed: 'img_legend'", file=sys.stderr)
+                return False
+        ### img_prefix
+        re_simple_str = re.compile("^([\w\-]*)$")
+        if not re_simple_str.search(config_task['img_prefix']):
             print("[EE] Configuration failed: 'img_prefix'", file=sys.stderr)
             return False
-        #__________________________________________________
+        ### img_directory
+        if not check_access_dir('rw', config_task['img_directory']):
+            return False
+        #______________________________________________________________________
         # time_period
         try:
             time_from = datetime.datetime.strptime(config_task['time_from'], "%Y/%m/%d %H:%M:%S")
@@ -105,7 +127,7 @@ def main():
             print("[EE] Exception Err: {}".format(err), file=sys.stderr)
             print("[EE] Exception Inf: {}".format(sys.exc_info()), file=sys.stderr)
             return False
-        #__________________________________________________
+        #______________________________________________________________________
         # Authorization
         cj = http.cookiejar.CookieJar()
         # WARNING: without urlencode
@@ -117,7 +139,12 @@ def main():
             ('Cache-Control', 'no-cache'),
             ]
         url = config_task['zabbix_url'].rstrip('/') + "/index.php"
-        response = opener.open(url, data.encode('utf-8'), timeout=25)
+        try:
+            response = opener.open(url, data.encode('utf-8'), timeout=25)
+        except Exception as err:
+            print("[EE] Exception Err: {}".format(err), file=sys.stderr)
+            print("[EE] Exception Inf: {}".format(sys.exc_info()), file=sys.stderr)
+            return False
         #print(response.read()) #### TEST
         ### Проверка
         cookies = {}
@@ -127,16 +154,40 @@ def main():
         if 'zbx_sessionid' not in cookies:
             print("[EE] Authorization failed", file=sys.stderr)
             return False
-        #______________________________________________________
+        #______________________________________________________________________
         # Download
         print("[..] Time period: '{}' - '{}' ({}s)".format(time_from, time_till, time_period))
         for i, graphid in enumerate(config_task['graphids']):
+            if config_task['img_prefix'] == "enumerate":
+                img_file_name = "{}.png".format(i+1)
+            else:
+                img_file_name = "{}{}.png".format(config_task['img_prefix'], graphid)
+            img_file_path = os.path.join(config_task['img_directory'], img_file_name)
+            #__________________________________________________________________
             opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
             url = config_task['zabbix_url'].rstrip('/')
-            url += "/chart2.php?graphid={0}&profileIdx=web.graphs&profileIdx2={0}".format(graphid)
-            url += "&width={}".format(config_task['img_widht'])
-            url += "&stime={}&period={}&isNow=0".format(time_from.strftime("%Y%m%d%H%M%S"), time_period)
-            #print url #### TEST
+            #
+            if config_task['zabbix_version'] in ("3.0", "3.2", "3.4"):
+                url += "/chart2.php?graphid={0}&profileIdx=web.graphs&profileIdx2={0}".format(graphid)
+                url += "&stime={}&period={}&isNow=0".format(time_from.strftime("%Y%m%d%H%M%S"), time_period)
+            else:
+                url += "/chart2.php?graphid={0}&profileIdx=web.graphs.filter&profileIdx2={0}".format(graphid)
+                url += "&from={}&to={}".format(time_from.strftime("%Y-%m-%d+%H:%M:%S"), time_till.strftime("%Y-%m-%d+%H:%M:%S"))
+            #
+            if config_task['img_widht']:
+                url += "&width={}".format(config_task['img_widht'])
+            if config_task['img_height']:
+                url += "&height={}".format(config_task['img_height'])
+            if not config_task['img_legend']:
+                    url += "&legend=0"
+            # TODO: &widget_view=0
+            #__________________________________________________________________
+            # Test mode
+            if args.test:
+                print("[..] {}".format(url))
+                print("[..] -> {}".format(img_file_path))
+                continue
+            #__________________________________________________________________
             opener.addheaders = [
                 ('User-Agent',    'Zabbix Get Graph'),
                 ('Cache-Control', 'no-cache'),
@@ -153,14 +204,12 @@ def main():
                 or response.headers['content-type'] != 'image/png' \
                 or (content[0]) != 137:
                     raise Exception('Download failed')
-            #__________________________________________________
+            #__________________________________________________________________
             # Save
-            img_file_name = "{}{}.png".format(config_task['img_prefix'], graphid)
-            img_file_path = os.path.join(config_task['img_directory'], img_file_name)
             with open(img_file_path, 'wb') as f:
                 f.write(content)
                 print("[OK] Graph id:{} saved: '{}'".format(graphid, img_file_path), file=sys.stderr)
-    #__________________________________________________
+    #__________________________________________________________________________
     return True
 
 
@@ -187,8 +236,16 @@ def check_access_dir(mode, *args):
         else:
             print("[EE] Does not exist: '{}'".format(x), file=sys.stderr)
             return_value = False
-    #______________________________________________________
+    #__________________________________________________________________________
     return return_value
+
+
+def isfloat(self, str):
+    try:
+        float(str)
+        return True
+    except ValueError:
+        return False
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

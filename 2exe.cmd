@@ -1,2 +1,2 @@
-python.exe 2exe.py build
+py -3 2exe.py build
 pause
