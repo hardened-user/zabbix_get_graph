@@ -5,7 +5,7 @@ Utility for downloading graphs from Zabbix Frontend
 
 Required
 =======
-* Zabbix 3.x, 4.x
+* Zabbix 3.x, 4.0
 * Python 3.x
 
 
