@@ -198,7 +198,6 @@ def main():
                     or 'content-type' not in response.headers \
                     or response.headers['content-type'] != 'image/png' \
                     or content[0] != 137:
-                # raise Exception(' failed')
                 print("[EE] Download failed:\nHTTP status code: {}\n{}".format(
                     response.code,
                     '\n'.join(["{}: {}".format(x, response.headers[x]) for x in response.headers]), flush=True))
