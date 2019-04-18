@@ -43,7 +43,7 @@ def main():
         config_ini = configparser.ConfigParser()
         config_ini.read(os.path.join(self_dir, 'config.ini'))
     except Exception as err:
-        print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())))
+        print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())), flush=True)
         return False
     # __________________________________________________________________________
     if not [x for x in config_ini.sections() if x != 'default']:
@@ -78,7 +78,7 @@ def main():
             except KeyError:
                 pass
             except Exception as err:
-                print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())))
+                print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())), flush=True)
                 return False
         # config task
         for x in config_task:
@@ -87,7 +87,7 @@ def main():
             except KeyError:
                 pass
             except Exception as err:
-                print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())))
+                print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())), flush=True)
                 return False
         # ______________________________________________________________________
         # zabbix_version
@@ -122,7 +122,7 @@ def main():
             time_till = datetime.datetime.strptime(config_task['time_till'], "%Y/%m/%d %H:%M:%S")
             time_period = int((time_till - time_from).total_seconds())
         except Exception as err:
-            print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())))
+            print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())), flush=True)
             return False
         # ______________________________________________________________________
         # Authorization
@@ -144,7 +144,7 @@ def main():
             print("[EE] HTTP Exception: {}".format(err), flush=True)
             return False
         except Exception as err:
-            print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())))
+            print("[!!] Unexpected Exception: {}\n{}".format(err, "".join(traceback.format_exc())), flush=True)
             return False
         # print(response.read()) #### TEST
         cookies = {}
